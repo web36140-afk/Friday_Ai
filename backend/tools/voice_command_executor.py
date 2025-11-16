@@ -481,6 +481,14 @@ class VoiceCommandExecutor(BaseTool):
             "minimize": {"action": "minimize_window"},
             "maximize": {"action": "maximize_window"},
             "close window": {"action": "close_window"},
+            # Media & volume controls
+            "pause": {"action": "media_play_pause"},
+            "play": {"action": "media_play_pause"},
+            "next": {"action": "media_next"},
+            "previous": {"action": "media_prev"},
+            "volume up": {"action": "volume_up"},
+            "volume down": {"action": "volume_down"},
+            "mute": {"action": "volume_mute"},
         }
         
         for cmd_phrase, cmd_data in system_commands.items():
@@ -521,6 +529,35 @@ class VoiceCommandExecutor(BaseTool):
             import pyautogui
             pyautogui.hotkey('alt', 'f4')
             result = {"success": True, "action": "close"}
+        elif action in ("media_play_pause", "media_next", "media_prev", "volume_up", "volume_down", "volume_mute"):
+            # Use keyboard media keys via pyautogui / keyboard
+            try:
+                import pyautogui
+                key_map = {
+                    "media_play_pause": "playpause",
+                    "media_next": "nexttrack",
+                    "media_prev": "prevtrack",
+                    "volume_up": "volumeup",
+                    "volume_down": "volumedown",
+                    "volume_mute": "volumemute",
+                }
+                pyautogui.press(key_map[action])
+                result = {"success": True, "action": action}
+            except Exception:
+                try:
+                    import keyboard  # type: ignore
+                    combo_map = {
+                        "media_play_pause": "play/pause media",
+                        "media_next": "next track",
+                        "media_prev": "previous track",
+                        "volume_up": "volume up",
+                        "volume_down": "volume down",
+                        "volume_mute": "mute",
+                    }
+                    keyboard.send(combo_map[action])
+                    result = {"success": True, "action": action}
+                except Exception as e:
+                    result = {"success": False, "error": str(e)}
         else:
             result = {"success": False, "error": "Unknown system command"}
         
