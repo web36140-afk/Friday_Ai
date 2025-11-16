@@ -16,6 +16,7 @@ import re
 from core.tool_manager import BaseTool
 from tools.voice_command_helper import voice_helper
 from tools.system_control_helper import system_helper
+from tools.youtube_control import YouTubeControlTool
 
 
 class VoiceCommandExecutor(BaseTool):
@@ -29,6 +30,9 @@ class VoiceCommandExecutor(BaseTool):
         
         # Browser paths (auto-detect)
         self.browsers = self._detect_browsers()
+        
+        # YouTube control
+        self.youtube = YouTubeControlTool()
         
         # Common app shortcuts
         self.app_shortcuts = {
@@ -242,6 +246,14 @@ class VoiceCommandExecutor(BaseTool):
         
         # Special-case: "open youtube" should open default browser to youtube.com
         if "youtube" in command:
+            # Pattern: "play <query> on youtube" or "search <query> on youtube"
+            yt_play_pattern = r"(?:play|search)\s+(.+?)\s+(?:on|in)\s+youtube"
+            m = re.search(yt_play_pattern, command, re.IGNORECASE)
+            if m:
+                query = m.group(1).strip()
+                # Delegate to YouTube control (autoplay best effort)
+                return await self.youtube.search_and_play(query=query, autoplay=True)
+            # Otherwise, just open YouTube home
             return await self._open_website("youtube")
         
         # 1. Check for browser + website combo
