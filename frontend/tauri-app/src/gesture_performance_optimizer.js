@@ -80,7 +80,7 @@ class GesturePerformanceOptimizer {
         
         // Send only the latest position
         try {
-            const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             await fetch(`${API_BASE_URL}/api/gesture/cursor`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

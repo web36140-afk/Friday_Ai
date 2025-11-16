@@ -419,7 +419,7 @@ class AdvancedWakeWordSystem {
         try {
             console.log('🎙️ Executing voice command:', command);
             
-            const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             const response = await fetch(`${API_BASE_URL}/api/voice/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -468,7 +468,7 @@ class AdvancedWakeWordSystem {
 
     async executeSystemCommand(command) {
         try {
-            const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             
             const commandMap = {
                 'sleep_pc': { gesture: 'sleep_pc' },

@@ -6,7 +6,7 @@ class ErrorHandler {
     constructor() {
         this.maxRetries = 3;
         this.retryDelay = 2000;
-        this.backendUrl = import.meta.env?.VITE_API_URL || '/api';
+        this.backendUrl = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
         this.isBackendOnline = true;
         this.reconnectionAttempts = 0;
         

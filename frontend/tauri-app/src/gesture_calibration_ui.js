@@ -294,7 +294,7 @@ class GestureCalibrationUI {
             localStorage.setItem('gesture_calibration', JSON.stringify(this.calibrationData));
             
             // Send to backend
-            const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             const response = await fetch(`${API_BASE_URL}/api/gesture/calibrate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
