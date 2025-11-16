@@ -292,6 +292,16 @@ class GestureCalibrationUI {
             
             // Save to localStorage
             localStorage.setItem('gesture_calibration', JSON.stringify(this.calibrationData));
+
+            // Apply to live tracker immediately
+            if (window.ultraGestureTracker) {
+                if (typeof this.calibrationData.smoothing === 'number') {
+                    window.ultraGestureTracker.smoothing.alpha = this.calibrationData.smoothing;
+                }
+                if (typeof this.calibrationData.sensitivity === 'number') {
+                    window.ultraGestureTracker.pointerSensitivity = this.calibrationData.sensitivity;
+                }
+            }
             
             // Send to backend
             const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';

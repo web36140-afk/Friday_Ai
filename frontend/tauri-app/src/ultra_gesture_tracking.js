@@ -6,6 +6,7 @@
 class UltraGestureTracker {
     constructor() {
         this.isActive = false;
+        this.isPaused = false;
         this.hands = null;
         this.camera = null;
         this.canvas = null;
@@ -72,6 +73,17 @@ class UltraGestureTracker {
     async initialize() {
         try {
             console.log('🚀 Initializing Ultra Gesture Tracking...');
+
+            // Apply saved calibration if available
+            const saved = localStorage.getItem('gesture_calibration');
+            if (saved) {
+                try {
+                    const cfg = JSON.parse(saved);
+                    if (cfg.smoothing) this.smoothing.alpha = cfg.smoothing;
+                    if (cfg.sensitivity) this.pointerSensitivity = cfg.sensitivity;
+                    console.log('🧭 Applied saved calibration to tracker');
+                } catch {}
+            }
             
             // Load MediaPipe Hands with ENHANCED settings
             this.hands = new Hands({
@@ -259,6 +271,11 @@ class UltraGestureTracker {
         // Convert normalized coordinates to screen coordinates
         let rawX = (1 - indexTip.x) * window.innerWidth;  // Mirror for natural feel
         let rawY = indexTip.y * window.innerHeight;
+
+        // Apply sensitivity scaling if configured
+        const sens = this.pointerSensitivity || 1.0;
+        rawX = Math.max(0, Math.min(window.innerWidth, rawX * sens));
+        rawY = Math.max(0, Math.min(window.innerHeight, rawY * sens));
         
         // Apply KALMAN FILTER for ultra-smooth tracking
         let screenX = this.applyKalmanFilter('x', rawX);
@@ -546,7 +563,7 @@ class UltraGestureTracker {
 
     startProcessing() {
         const processFrame = async () => {
-            if (this.isActive && this.videoElement) {
+            if (this.isActive && !this.isPaused && this.videoElement) {
                 await this.hands.send({ image: this.videoElement });
             }
             requestAnimationFrame(processFrame);
@@ -554,6 +571,17 @@ class UltraGestureTracker {
         
         this.isActive = true;
         processFrame();
+    }
+
+    pause() {
+        this.isPaused = true;
+        this.hideVirtualCursor();
+        console.log('⏸️ Gesture Tracking paused');
+    }
+
+    resume() {
+        this.isPaused = false;
+        console.log('▶️ Gesture Tracking resumed');
     }
 
     stop() {
@@ -589,6 +617,20 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Global hotkey: Ctrl+G to pause/resume tracking
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key.toLowerCase() === 'g') {
+            if (!window.ultraGestureTracker.isActive) return;
+            if (window.ultraGestureTracker.isPaused) {
+                window.ultraGestureTracker.resume();
+                if (window.notificationSystem) window.notificationSystem.show('▶️ Gesture tracking resumed', 'success');
+            } else {
+                window.ultraGestureTracker.pause();
+                if (window.notificationSystem) window.notificationSystem.show('⏸️ Gesture tracking paused', 'info');
+            }
+        }
+    });
 });
 
 console.log('✅ Ultra Gesture Tracking module loaded');
