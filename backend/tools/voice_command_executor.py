@@ -16,6 +16,7 @@ import re
 from core.tool_manager import BaseTool
 from tools.voice_command_helper import voice_helper
 from tools.system_control_helper import system_helper
+from tools.alexa_features import alexa_features
 from tools.youtube_control import YouTubeControlTool
 
 
@@ -255,6 +256,17 @@ class VoiceCommandExecutor(BaseTool):
                 return await self.youtube.search_and_play(query=query, autoplay=True)
             # Otherwise, just open YouTube home
             return await self._open_website("youtube")
+        
+        # Reminders/Timers: "remind me in 20 minutes to take a break"
+        timer_match = re.search(r"remind me in\s+(\d+)\s*(seconds|second|minutes|minute|hours|hour)\s*(?:to\s+(.*))?", command, re.IGNORECASE)
+        if timer_match:
+            qty = int(timer_match.group(1))
+            unit = timer_match.group(2).lower()
+            note = (timer_match.group(3) or "Reminder").strip()
+            mult = 1 if unit.startswith('second') else (60 if unit.startswith('minute') else 3600)
+            duration = max(1, qty * mult)
+            result = alexa_features.set_timer(duration, note or "Timer")
+            return {"action": "set_timer", "duration": duration, "note": note, **result}
         
         # 1. Check for browser + website combo
         browser_website = self._parse_browser_website(command)
