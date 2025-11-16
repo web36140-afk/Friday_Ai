@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     enable_web_search: bool = Field(default=True, env="ENABLE_WEB_SEARCH")
     enable_os_automation: bool = Field(default=True, env="ENABLE_OS_AUTOMATION")
     enable_hardware_monitoring: bool = Field(default=True, env="ENABLE_HARDWARE_MONITORING")
+    enable_local_tts: bool = Field(default=True, env="ENABLE_LOCAL_TTS")
     
     # Code Execution
     code_execution_timeout: int = Field(default=30, env="CODE_EXECUTION_TIMEOUT")

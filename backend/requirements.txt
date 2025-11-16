@@ -101,3 +101,6 @@ loguru==0.7.2
 faster-whisper==1.0.0
 soundfile==0.12.1
 
+# Optional Offline TTS (Coqui). Install torch separately if needed.
+TTS==0.15.5
+

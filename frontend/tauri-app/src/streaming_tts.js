@@ -69,14 +69,27 @@ class StreamingTTSEngine {
                 return;
             }
             
-            const response = await fetch(`${API_BASE_URL}/api/chat/tts`, {
+            // Prefer local TTS first if available
+            let response = await fetch(`${API_BASE_URL}/api/tts/local`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: text,
+                    language_code: (language || 'en-US').split('-')[0]  // 'en-US' -> 'en'
+                })
+            }).catch(() => null);
+
+            // Fallback to cloud/edge TTS endpoint if local unavailable
+            if (!response || !response.ok) {
+                response = await fetch(`${API_BASE_URL}/api/chat/tts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: text,
                     language: language
                 })
-            });
+                });
+            }
             
             if (!response.ok) {
                 console.warn(`⚠️ TTS failed for chunk ${chunkId}, using fallback`);

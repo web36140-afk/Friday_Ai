@@ -204,6 +204,7 @@ app.include_router(stt_api.router, tags=["Offline STT"])
 # TTS endpoint
 from fastapi import Body
 from core.tts_engine import tts_engine
+from tools.tts_local import get_local_tts, LocalTTSUnavailable
 
 @app.post("/api/tts")
 async def text_to_speech(
@@ -218,6 +219,22 @@ async def text_to_speech(
     else:
         return {"success": False, "error": "TTS generation failed"}
 
+
+@app.post("/api/tts/local")
+async def text_to_speech_local(
+    text: str = Body(..., embed=True),
+    language_code: str = Body(default="en", embed=True),
+    speaker: str = Body(default=None, embed=True)
+):
+    """Offline local TTS using Coqui XTTS v2 (if installed)."""
+    try:
+        local_tts = get_local_tts()
+        audio_data = local_tts.synthesize(text=text, language=language_code, speaker=speaker)
+        return {"success": True, "audio": audio_data}
+    except LocalTTSUnavailable as e:
+        return {"success": False, "error": f"Local TTS unavailable: {e}"}
+    except Exception as e:
+        return {"success": False, "error": f"Local TTS error: {e}"}
 
 # ============================================
 # Main Entry Point
