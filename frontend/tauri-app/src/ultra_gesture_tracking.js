@@ -84,6 +84,21 @@ class UltraGestureTracker {
                     console.log('🧭 Applied saved calibration to tracker');
                 } catch {}
             }
+
+            // Fetch multi-monitor virtual bounds
+            try {
+                const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                const resp = await fetch(`${API_BASE_URL}/api/display/monitors`);
+                const data = await resp.json();
+                if (data?.success) {
+                    this.virtual = data.virtual; // {left, top, width, height}
+                    this.monitors = data.monitors || [];
+                    console.log('🖥️ Virtual desktop:', this.virtual, 'Monitors:', this.monitors.length);
+                }
+            } catch (e) {
+                console.warn('Display info unavailable, using window size');
+                this.virtual = { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+            }
             
             // Load MediaPipe Hands with ENHANCED settings
             this.hands = new Hands({
@@ -269,13 +284,15 @@ class UltraGestureTracker {
         const indexTip = landmarks[8];
         
         // Convert normalized coordinates to screen coordinates
-        let rawX = (1 - indexTip.x) * window.innerWidth;  // Mirror for natural feel
-        let rawY = indexTip.y * window.innerHeight;
+        const vw = (this.virtual?.width || window.innerWidth);
+        const vh = (this.virtual?.height || window.innerHeight);
+        let rawX = (1 - indexTip.x) * vw;  // Mirror for natural feel across virtual space
+        let rawY = indexTip.y * vh;
 
         // Apply sensitivity scaling if configured
         const sens = this.pointerSensitivity || 1.0;
-        rawX = Math.max(0, Math.min(window.innerWidth, rawX * sens));
-        rawY = Math.max(0, Math.min(window.innerHeight, rawY * sens));
+        rawX = Math.max(0, Math.min(vw, rawX * sens));
+        rawY = Math.max(0, Math.min(vh, rawY * sens));
         
         // Apply KALMAN FILTER for ultra-smooth tracking
         let screenX = this.applyKalmanFilter('x', rawX);
@@ -314,8 +331,8 @@ class UltraGestureTracker {
         // Show and position cursor
         if (this.cursorElement) {
             this.cursorElement.style.display = 'block';
-            this.cursorElement.style.left = `${screenX}px`;
-            this.cursorElement.style.top = `${screenY}px`;
+            this.cursorElement.style.left = `${(screenX / vw) * window.innerWidth}px`;
+            this.cursorElement.style.top = `${(screenY / vh) * window.innerHeight}px`;
         }
         
         // Send cursor position to backend for OS-level control
@@ -448,9 +465,11 @@ class UltraGestureTracker {
     async sendCursorUpdate(x, y) {
         // Use performance optimizer for batched updates (10x faster!)
         if (window.gestureOptimizer) {
+            const vw = (this.virtual?.width || window.innerWidth);
+            const vh = (this.virtual?.height || window.innerHeight);
             await window.gestureOptimizer.batchCursorUpdate(
-                x / window.innerWidth,
-                y / window.innerHeight
+                x / vw,
+                y / vh
             );
         } else {
             // Fallback: throttled updates
@@ -462,12 +481,14 @@ class UltraGestureTracker {
             
             try {
                 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                const vw = (this.virtual?.width || window.innerWidth);
+                const vh = (this.virtual?.height || window.innerHeight);
                 await fetch(`${API_BASE_URL}/api/gesture/cursor`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        x: x / window.innerWidth,
-                        y: y / window.innerHeight,
+                        x: x / vw,
+                        y: y / vh,
                         smooth: true
                     }),
                     keepalive: true

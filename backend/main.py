@@ -202,6 +202,8 @@ from api import local_llm_api
 app.include_router(local_llm_api.router, tags=["Local LLM"])
 from api import stt_api
 app.include_router(stt_api.router, tags=["Offline STT"])
+from api import display_api
+app.include_router(display_api.router, tags=["Display"])
 
 # TTS endpoint
 from fastapi import Body
