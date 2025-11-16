@@ -204,6 +204,8 @@ from api import stt_api
 app.include_router(stt_api.router, tags=["Offline STT"])
 from api import display_api
 app.include_router(display_api.router, tags=["Display"])
+from api import windows_api
+app.include_router(windows_api.router, tags=["Windows Control"])
 
 # TTS endpoint
 from fastapi import Body

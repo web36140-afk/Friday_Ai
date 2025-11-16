@@ -552,11 +552,22 @@ class UltraGestureTracker {
         // Execute swipe action
         try {
             const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-            await fetch(`${API_BASE_URL}/api/gesture/swipe`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ direction: swipe.direction })
-            });
+            // Map swipe to window snap for productivity
+            const dir = swipe.direction;
+            if (['left', 'right', 'up', 'down'].includes(dir)) {
+                await fetch(`${API_BASE_URL}/api/windows/snap`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ direction: dir })
+                });
+            } else {
+                // Fallback: send as gesture swipe to backend
+                await fetch(`${API_BASE_URL}/api/gesture/swipe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ direction: swipe.direction })
+                });
+            }
         } catch (error) {
             console.error('Swipe failed:', error);
         }
