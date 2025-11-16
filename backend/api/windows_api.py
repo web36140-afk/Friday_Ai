@@ -140,3 +140,31 @@ def active_window():
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
+
+@router.post("/snap_grid")
+def snap_grid(cols: int, rows: int, col: int, row: int):
+    """
+    Snap active window into a grid cell.
+    cols/rows: grid size (e.g., 3x1 for thirds)
+    col/row: zero-based target cell
+    """
+    if not _ensure_pywin32():
+        return JSONResponse({"success": False, "error": "pywin32 not available"}, status_code=400)
+    import win32gui, win32con, win32api  # noqa
+    try:
+        hwnd = win32gui.GetForegroundWindow()
+        if not hwnd:
+            return {"success": False, "error": "No foreground window"}
+        vl = win32api.GetSystemMetrics(win32con.SM_XVIRTUALSCREEN)
+        vt = win32api.GetSystemMetrics(win32con.SM_YVIRTUALSCREEN)
+        vw = win32api.GetSystemMetrics(win32con.SM_CXVIRTUALSCREEN)
+        vh = win32api.GetSystemMetrics(win32con.SM_CYVIRTUALSCREEN)
+        cell_w = max(1, vw // max(1, cols))
+        cell_h = max(1, vh // max(1, rows))
+        x = vl + max(0, min(cols - 1, col)) * cell_w
+        y = vt + max(0, min(rows - 1, row)) * cell_h
+        win32gui.MoveWindow(hwnd, x, y, cell_w, cell_h, True)
+        return {"success": True}
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+

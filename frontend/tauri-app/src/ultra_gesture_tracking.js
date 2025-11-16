@@ -778,9 +778,38 @@ class UltraGestureTracker {
                     body: JSON.stringify({ direction: swipe.direction })
                 });
             }
+
+            // App-specific bindings (simple defaults)
+            await this.applyAppBindings(dir);
         } catch (error) {
             console.error('Swipe failed:', error);
         }
+    }
+
+    async applyAppBindings(direction) {
+        try {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const resp = await fetch(`${API_BASE_URL}/api/windows/active_window`);
+            const data = await resp.json();
+            if (!data?.success) return;
+            const exe = (data.exe || '').toLowerCase();
+
+            // VSCode: left/right = switch tabs, up = command palette, down = close tab
+            if (exe.includes('code.exe')) {
+                if (direction === 'left') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+pageup' }) });
+                if (direction === 'right') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+pagedown' }) });
+                if (direction === 'up') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+shift+p' }) });
+                if (direction === 'down') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+w' }) });
+            }
+
+            // Chrome/Edge: left/right = switch tabs, up = new tab, down = close tab
+            if (exe.includes('chrome') || exe.includes('msedge')) {
+                if (direction === 'left') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+shift+tab' }) });
+                if (direction === 'right') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+tab' }) });
+                if (direction === 'up') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+t' }) });
+                if (direction === 'down') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+w' }) });
+            }
+        } catch {}
     }
 
     async updateAppProfile() {

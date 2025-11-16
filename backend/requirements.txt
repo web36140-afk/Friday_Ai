@@ -103,4 +103,5 @@ soundfile==0.12.1
 
 # Optional Offline TTS (Coqui). Install torch separately if needed.
 TTS==0.15.5
+keyboard==0.13.5
 

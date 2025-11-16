@@ -206,6 +206,8 @@ from api import display_api
 app.include_router(display_api.router, tags=["Display"])
 from api import windows_api
 app.include_router(windows_api.router, tags=["Windows Control"])
+from api import keyboard_api
+app.include_router(keyboard_api.router, tags=["Keyboard"])
 
 # TTS endpoint
 from fastapi import Body
