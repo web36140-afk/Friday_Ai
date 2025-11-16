@@ -17,11 +17,19 @@ class UltraGestureTracker {
         this.smoothing = {
             positions: [],
             maxHistory: 8,  // Increased history for better smoothing
-            alpha: 0.25,    // Lower = smoother (0.1-0.5 range)
+            alpha: 0.25,    // Lower = smoother (0.1-0.5 range) - dynamically adjusted
             kalmanFilter: {
                 x: { estimate: 0, error: 1, processNoise: 0.001, measurementNoise: 0.1 },
                 y: { estimate: 0, error: 1, processNoise: 0.001, measurementNoise: 0.1 }
             }
+        };
+        
+        // Per-finger smoothing (for all 5 fingertips)
+        this.fingerSmoothing = {
+            indices: [4, 8, 12, 16, 20],
+            history: new Map(), // fingerIndex -> [{x,y,time}, ...]
+            maxHistory: 6,
+            alpha: 0.35
         };
         
         // Adaptive lighting compensation
@@ -151,7 +159,7 @@ class UltraGestureTracker {
             video: {
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
-                frameRate: { ideal: 30 },
+                frameRate: { ideal: 60, max: 60 },
                 facingMode: 'user',
                 // Advanced camera settings for better low-light
                 exposureMode: 'continuous',
@@ -183,6 +191,26 @@ class UltraGestureTracker {
         filter.error = (1 - kalmanGain) * prioriError;
         
         return filter.estimate;
+    }
+    
+    smoothPointEMA(last, current, alpha) {
+        if (!last) return current;
+        return {
+            x: last.x + (current.x - last.x) * alpha,
+            y: last.y + (current.y - last.y) * alpha
+        };
+    }
+    
+    smoothFingerTip(index, point) {
+        const key = String(index);
+        const hist = this.fingerSmoothing.history.get(key) || [];
+        const alpha = this.fingerSmoothing.alpha;
+        const last = hist.length ? hist[hist.length - 1] : null;
+        const smoothed = this.smoothPointEMA(last, point, alpha);
+        hist.push({ x: smoothed.x, y: smoothed.y, time: Date.now() });
+        if (hist.length > this.fingerSmoothing.maxHistory) hist.shift();
+        this.fingerSmoothing.history.set(key, hist);
+        return smoothed;
     }
 
     createVirtualCursor() {
@@ -255,6 +283,18 @@ class UltraGestureTracker {
             // Store hand data
             this.hands_data[handedness.toLowerCase()] = landmarks;
             
+            // Smooth all five fingertips for stability (indices: 4,8,12,16,20)
+            const vw = (this.virtual?.width || window.innerWidth);
+            const vh = (this.virtual?.height || window.innerHeight);
+            const fingertipIndices = this.fingerSmoothing.indices;
+            this.fingers = this.fingers || { left: {}, right: {} };
+            for (const fi of fingertipIndices) {
+                const tip = landmarks[fi];
+                const pt = { x: (1 - tip.x) * vw, y: tip.y * vh };
+                const smoothed = this.smoothFingerTip(fi, pt);
+                this.fingers[handedness.toLowerCase()][fi] = smoothed;
+            }
+            
             // Use right hand (or dominant hand) for cursor control
             if (handedness === 'Right' || i === 0) {
                 await this.processCursorControl(landmarks);
@@ -294,15 +334,24 @@ class UltraGestureTracker {
         rawX = Math.max(0, Math.min(vw, rawX * sens));
         rawY = Math.max(0, Math.min(vh, rawY * sens));
         
-        // Apply KALMAN FILTER for ultra-smooth tracking
+        // Apply KALMAN FILTER for ultra-smooth tracking with dynamic responsiveness
+        const prev = this.smoothing.positions.length ? this.smoothing.positions[this.smoothing.positions.length - 1] : null;
+        const speed = prev ? Math.hypot(rawX - prev.x, rawY - prev.y) : 0;
+        const kfX = this.smoothing.kalmanFilter.x;
+        const kfY = this.smoothing.kalmanFilter.y;
+        const baseNoise = 0.08;
+        const extra = Math.min(0.25, speed / 800); // increase noise when moving fast to stay responsive
+        kfX.measurementNoise = baseNoise + extra;
+        kfY.measurementNoise = baseNoise + extra;
         let screenX = this.applyKalmanFilter('x', rawX);
         let screenY = this.applyKalmanFilter('y', rawY);
         
         // Apply EXPONENTIAL MOVING AVERAGE for additional smoothing
         if (this.smoothing.positions.length > 0) {
             const lastPos = this.smoothing.positions[this.smoothing.positions.length - 1];
-            screenX = lastPos.x + (screenX - lastPos.x) * this.smoothing.alpha;
-            screenY = lastPos.y + (screenY - lastPos.y) * this.smoothing.alpha;
+            const dynAlpha = Math.min(0.5, 0.15 + Math.min(0.35, speed / 1200)); // faster when moving fast
+            screenX = lastPos.x + (screenX - lastPos.x) * dynAlpha;
+            screenY = lastPos.y + (screenY - lastPos.y) * dynAlpha;
         }
         
         // Apply WEIGHTED AVERAGE across history buffer
@@ -336,7 +385,7 @@ class UltraGestureTracker {
         }
         
         // Send cursor position to backend for OS-level control
-        await this.sendCursorUpdate(screenX, screenY);
+        this.sendCursorUpdate(screenX, screenY); // fire-and-forget to keep loop hot
     }
 
     async detectGestures(landmarks) {
@@ -475,7 +524,7 @@ class UltraGestureTracker {
         if (window.gestureOptimizer) {
             const vw = (this.virtual?.width || window.innerWidth);
             const vh = (this.virtual?.height || window.innerHeight);
-            await window.gestureOptimizer.batchCursorUpdate(
+            window.gestureOptimizer.batchCursorUpdate(
                 x / vw,
                 y / vh
             );
@@ -491,7 +540,7 @@ class UltraGestureTracker {
                 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                 const vw = (this.virtual?.width || window.innerWidth);
                 const vh = (this.virtual?.height || window.innerHeight);
-                await fetch(`${API_BASE_URL}/api/gesture/cursor`, {
+                fetch(`${API_BASE_URL}/api/gesture/cursor`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -640,16 +689,24 @@ class UltraGestureTracker {
     startProcessing() {
         const processFrame = async () => {
             if (this.isActive && !this.isPaused && this.videoElement) {
-                await this.hands.send({ image: this.videoElement });
+                if (typeof this.videoElement.requestVideoFrameCallback === 'function') {
+                    this.videoElement.requestVideoFrameCallback(async () => {
+                        await this.hands.send({ image: this.videoElement });
+                        requestAnimationFrame(processFrame);
+                    });
+                    return;
+                } else {
+                    await this.hands.send({ image: this.videoElement });
+                }
             }
             requestAnimationFrame(processFrame);
         };
         
         this.isActive = true;
 
-        // Periodically update app profile (every 4s)
+        // Periodically update app profile (every 3s for responsiveness)
         if (!this._profileTimer) {
-            this._profileTimer = setInterval(() => this.updateAppProfile(), 4000);
+            this._profileTimer = setInterval(() => this.updateAppProfile(), 3000);
         }
         processFrame();
     }
