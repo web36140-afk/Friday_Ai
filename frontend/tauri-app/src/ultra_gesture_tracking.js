@@ -206,7 +206,19 @@ class UltraGestureTracker {
         const hist = this.fingerSmoothing.history.get(key) || [];
         const alpha = this.fingerSmoothing.alpha;
         const last = hist.length ? hist[hist.length - 1] : null;
-        const smoothed = this.smoothPointEMA(last, point, alpha);
+        // Outlier rejection: if jump > threshold, clamp toward last
+        let candidate = point;
+        if (last) {
+            const dx = point.x - last.x;
+            const dy = point.y - last.y;
+            const dist = Math.hypot(dx, dy);
+            const maxJump = 120; // pixels per frame
+            if (dist > maxJump) {
+                const scale = maxJump / dist;
+                candidate = { x: last.x + dx * scale, y: last.y + dy * scale };
+            }
+        }
+        const smoothed = this.smoothPointEMA(last, candidate, alpha);
         hist.push({ x: smoothed.x, y: smoothed.y, time: Date.now() });
         if (hist.length > this.fingerSmoothing.maxHistory) hist.shift();
         this.fingerSmoothing.history.set(key, hist);
@@ -251,6 +263,25 @@ class UltraGestureTracker {
         
         document.body.appendChild(cursor);
         this.cursorElement = cursor;
+        
+        // Create a canvas overlay for fingertip visualization & HUD
+        const canvas = document.createElement('canvas');
+        canvas.id = 'gesture-hud';
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.cssText = `
+            position: fixed;
+            left: 0; top: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 999998;
+        `;
+        document.body.appendChild(canvas);
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
         
         console.log('✨ Virtual cursor created with Kalman filtering');
     }
@@ -317,6 +348,9 @@ class UltraGestureTracker {
                 this.performance.skipFrames--;
             }
         }
+        
+        // Render fingertip overlay and HUD
+        this.renderHUD();
     }
 
     async processCursorControl(landmarks) {
@@ -386,6 +420,58 @@ class UltraGestureTracker {
         
         // Send cursor position to backend for OS-level control
         this.sendCursorUpdate(screenX, screenY); // fire-and-forget to keep loop hot
+    }
+
+    renderHUD() {
+        if (!this.ctx || !this.canvas) return;
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        
+        // Draw fingertip positions with small trails
+        if (this.fingers) {
+            const hands = ['left', 'right'];
+            for (const hand of hands) {
+                const tips = this.fingers[hand] || {};
+                Object.keys(tips).forEach((idxStr) => {
+                    const tip = tips[idxStr];
+                    if (!tip) return;
+                    const color = hand === 'right' ? '#00d9ff' : '#ff4d4d';
+                    ctx.fillStyle = color;
+                    ctx.strokeStyle = color;
+                    // Tip dot
+                    ctx.beginPath();
+                    const vw = (this.virtual?.width || window.innerWidth);
+                    const vh = (this.virtual?.height || window.innerHeight);
+                    const px = (tip.x / vw) * w;
+                    const py = (tip.y / vh) * h;
+                    ctx.arc(px, py, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Trail from history buffer (fade)
+                    const hist = this.fingerSmoothing.history.get(idxStr) || [];
+                    for (let i = Math.max(0, hist.length - 5); i < hist.length - 1; i++) {
+                        const a = hist[i], b = hist[i + 1];
+                        const ax = (a.x / vw) * w, ay = (a.y / vh) * h;
+                        const bx = (b.x / vw) * w, by = (b.y / vh) * h;
+                        ctx.globalAlpha = 0.2 + (i - (hist.length - 6)) * 0.15;
+                        ctx.beginPath();
+                        ctx.moveTo(ax, ay);
+                        ctx.lineTo(bx, by);
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                    }
+                });
+            }
+        }
+        
+        // HUD text: FPS and latency
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
+        const fps = window.gestureOptimizer?.getFPS?.() || '';
+        const latency = Math.round(this.performance.lastProcessTime);
+        ctx.fillText(`FPS: ${fps || '--'} | Latency: ${latency}ms`, 12, 20);
     }
 
     async detectGestures(landmarks) {
