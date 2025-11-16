@@ -203,7 +203,8 @@ class AdvancedWakeWordSystem {
                 this.commandStarted = true;
                 this.currentCommand = text.trim();
                 this.updateCommandPreview(this.currentCommand);
-                this.resetSilenceTimer();
+                // For local STT chunks, (re)start silence detection so we auto-submit after user stops
+                this.startSilenceDetection();
             });
         } else {
             this.commandRecognition.onresult = (event) => {
