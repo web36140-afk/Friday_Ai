@@ -445,7 +445,15 @@ class UltraGestureTracker {
         
         if (speed > 2 && distance > 100) { // Fast movement
             let direction;
-            if (Math.abs(dx) > Math.abs(dy)) {
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+            const diagonal = Math.abs(absDx - absDy) < Math.min(absDx, absDy) * 0.3; // ~ within 30%
+            if (diagonal) {
+                if (dx < 0 && dy < 0) direction = 'up-left';
+                else if (dx > 0 && dy < 0) direction = 'up-right';
+                else if (dx < 0 && dy > 0) direction = 'down-left';
+                else direction = 'down-right';
+            } else if (absDx > absDy) {
                 direction = dx > 0 ? 'right' : 'left';
             } else {
                 direction = dy > 0 ? 'down' : 'up';
@@ -560,6 +568,13 @@ class UltraGestureTracker {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ direction: dir })
                 });
+            } else if (['up-left', 'up-right', 'down-left', 'down-right'].includes(dir)) {
+                const mapCorner = { 'up-left': 'tl', 'up-right': 'tr', 'down-left': 'bl', 'down-right': 'br' };
+                await fetch(`${API_BASE_URL}/api/windows/snap_corner`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ corner: mapCorner[dir] })
+                });
             } else {
                 // Fallback: send as gesture swipe to backend
                 await fetch(`${API_BASE_URL}/api/gesture/swipe`, {
@@ -571,6 +586,35 @@ class UltraGestureTracker {
         } catch (error) {
             console.error('Swipe failed:', error);
         }
+    }
+
+    async updateAppProfile() {
+        try {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const resp = await fetch(`${API_BASE_URL}/api/windows/active_window`);
+            const data = await resp.json();
+            if (!data?.success) return;
+            const exe = (data.exe || '').toLowerCase();
+            // Simple profiles: adjust sensitivity per app
+            if (exe.includes('code.exe')) {
+                this.pointerSensitivity = 0.9; // precision for VSCode
+            } else if (exe.includes('photoshop')) {
+                this.pointerSensitivity = 0.8; // finer control
+            } else if (exe.includes('chrome') || exe.includes('msedge')) {
+                this.pointerSensitivity = 1.0;
+            } else {
+                // default from calibration if set
+                const saved = localStorage.getItem('gesture_calibration');
+                if (saved) {
+                    try {
+                        const cfg = JSON.parse(saved);
+                        this.pointerSensitivity = cfg.sensitivity || 1.0;
+                    } catch {}
+                } else {
+                    this.pointerSensitivity = 1.0;
+                }
+            }
+        } catch {}
     }
 
     updateCursorStyle() {
@@ -602,6 +646,11 @@ class UltraGestureTracker {
         };
         
         this.isActive = true;
+
+        // Periodically update app profile (every 4s)
+        if (!this._profileTimer) {
+            this._profileTimer = setInterval(() => this.updateAppProfile(), 4000);
+        }
         processFrame();
     }
 
@@ -622,6 +671,10 @@ class UltraGestureTracker {
         
         if (this.videoElement && this.videoElement.srcObject) {
             this.videoElement.srcObject.getTracks().forEach(track => track.stop());
+        }
+        if (this._profileTimer) {
+            clearInterval(this._profileTimer);
+            this._profileTimer = null;
         }
         
         console.log('🛑 Ultra Gesture Tracking stopped');

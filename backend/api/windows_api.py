@@ -88,3 +88,55 @@ def minimize():
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@router.post("/snap_corner")
+def snap_corner(corner: str):
+    """
+    Snap active window to a corner: tl, tr, bl, br.
+    """
+    if not _ensure_pywin32():
+        return JSONResponse({"success": False, "error": "pywin32 not available"}, status_code=400)
+
+    import win32gui, win32con, win32api  # noqa
+    try:
+        hwnd = win32gui.GetForegroundWindow()
+        if not hwnd:
+            return {"success": False, "error": "No foreground window"}
+
+        vl = win32api.GetSystemMetrics(win32con.SM_XVIRTUALSCREEN)
+        vt = win32api.GetSystemMetrics(win32con.SM_YVIRTUALSCREEN)
+        vw = win32api.GetSystemMetrics(win32con.SM_CXVIRTUALSCREEN)
+        vh = win32api.GetSystemMetrics(win32con.SM_CYVIRTUALSCREEN)
+
+        w = vw // 2
+        h = vh // 2
+        x = vl if corner in ("tl", "bl") else vl + w
+        y = vt if corner in ("tl", "tr") else vt + h
+
+        win32gui.MoveWindow(hwnd, x, y, w, h, True)
+        return {"success": True}
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/active_window")
+def active_window():
+    """
+    Return active window title and process executable (best-effort).
+    """
+    if not _ensure_pywin32():
+        return JSONResponse({"success": False, "error": "pywin32 not available"}, status_code=400)
+    try:
+        import win32gui, win32process, psutil  # type: ignore
+        hwnd = win32gui.GetForegroundWindow()
+        title = win32gui.GetWindowText(hwnd) if hwnd else ""
+        exe = ""
+        if hwnd:
+            tid, pid = win32process.GetWindowThreadProcessId(hwnd)
+            try:
+                exe = psutil.Process(pid).name()
+            except Exception:
+                exe = ""
+        return {"success": True, "title": title, "exe": exe}
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
