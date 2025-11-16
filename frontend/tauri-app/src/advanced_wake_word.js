@@ -318,6 +318,10 @@ class AdvancedWakeWordSystem {
         if (this.commandRecognition) {
             this.commandRecognition.stop();
         }
+        // Stop local STT if active
+        if (window.localSTT && typeof window.localSTT.stop === 'function') {
+            window.localSTT.stop();
+        }
         
         this.isListeningForCommand = false;
         
@@ -523,6 +527,10 @@ class AdvancedWakeWordSystem {
         this.commandStarted = false;
         this.currentCommand = '';
         this.resetSilenceTimer();
+        // Stop local STT if active
+        if (window.localSTT && typeof window.localSTT.stop === 'function') {
+            window.localSTT.stop();
+        }
         
         // Restart wake word listening
         if (this.isActive) {

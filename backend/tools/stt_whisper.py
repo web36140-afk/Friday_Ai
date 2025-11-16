@@ -2,8 +2,8 @@ from loguru import logger
 from typing import Optional, List
 from faster_whisper import WhisperModel
 import numpy as np
-import soundfile as sf
 import io
+from pydub import AudioSegment
 
 
 class LocalWhisperSTT:
@@ -26,25 +26,17 @@ class LocalWhisperSTT:
 
     def transcribe_wav_bytes(self, wav_bytes: bytes, language: Optional[str] = None) -> str:
         """
-        Transcribe a full WAV audio buffer (bytes). Returns text.
+        Transcribe an audio buffer (bytes). Handles webm/ogg/wav via pydub/ffmpeg.
+        Returns text.
         """
         try:
-            data, sr = sf.read(io.BytesIO(wav_bytes))
-            if sr != 16000:
-                # Resample to 16k if needed
-                import numpy as np
-                import math
-                ratio = 16000 / sr
-                new_length = math.floor(len(data) * ratio)
-                x = np.linspace(0, 1, len(data))
-                xp = np.linspace(0, 1, new_length)
-                data = np.interp(xp, x, data).astype(np.float32)
-                sr = 16000
-            if data.ndim > 1:
-                data = np.mean(data, axis=1)  # mono
+            # Decode with pydub (requires ffmpeg installed)
+            audio = AudioSegment.from_file(io.BytesIO(wav_bytes))
+            audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)  # 16-bit PCM mono 16k
+            samples = np.array(audio.get_array_of_samples()).astype(np.float32) / 32768.0
 
             segments, _ = self.model.transcribe(
-                data,
+                samples,
                 language=language,
                 beam_size=1,
                 vad_filter=True

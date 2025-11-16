@@ -171,7 +171,11 @@ function initializeEventListeners() {
     // Stop speech button
     const stopSpeechBtn = document.getElementById('stop-speech-btn');
     if (stopSpeechBtn) {
-        stopSpeechBtn.addEventListener('click', stopSpeaking);
+        stopSpeechBtn.addEventListener('click', () => {
+            if (window.streamingTTS && typeof window.streamingTTS.stopSpeaking === 'function') {
+                window.streamingTTS.stopSpeaking();
+            }
+        });
     }
     
     // Wake word button
