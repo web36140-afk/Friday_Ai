@@ -444,7 +444,7 @@ class UltraGestureTracker {
             this.lastCursorUpdate = now;
             
             try {
-                const API_BASE_URL = 'http://localhost:8000';
+                const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
                 await fetch(`${API_BASE_URL}/api/gesture/cursor`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -472,7 +472,7 @@ class UltraGestureTracker {
         
         // Execute click via backend
         try {
-            const API_BASE_URL = 'http://localhost:8000';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
             await fetch(`${API_BASE_URL}/api/gesture/click`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -497,7 +497,7 @@ class UltraGestureTracker {
             
             // Start drag
             try {
-                const API_BASE_URL = 'http://localhost:8000';
+                const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
                 await fetch(`${API_BASE_URL}/api/gesture/drag-start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
@@ -513,7 +513,7 @@ class UltraGestureTracker {
         
         // Execute swipe action
         try {
-            const API_BASE_URL = 'http://localhost:8000';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
             await fetch(`${API_BASE_URL}/api/gesture/swipe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

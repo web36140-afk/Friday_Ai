@@ -3,7 +3,7 @@
  * Handles timers, lists, routines, and smart queries
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 class AlexaVoiceCommands {
     constructor() {

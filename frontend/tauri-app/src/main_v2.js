@@ -4,7 +4,7 @@
  * Backend is stateless - just processes messages
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // SIMPLE STATE - Frontend keeps EVERYTHING
 const fridayV2 = {
