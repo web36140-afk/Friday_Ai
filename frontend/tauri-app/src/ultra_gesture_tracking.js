@@ -13,6 +13,10 @@ class UltraGestureTracker {
         this.ctx = null;
         this.videoElement = null;
         
+        // Snap overlay
+        this.snapOverlayActive = false;
+        this.snapGrid = { cols: 3, rows: 3 };
+        
         // Advanced smoothing for cursor (ENHANCED)
         this.smoothing = {
             positions: [],
@@ -483,6 +487,32 @@ class UltraGestureTracker {
         const latency = Math.round(this.performance.lastProcessTime);
         const confPct = Math.round((this.confidence?.value || 0) * 100);
         ctx.fillText(`FPS: ${fps || '--'} | Latency: ${latency}ms | Confidence: ${confPct}%`, 12, 20);
+        
+        // Snap grid overlay
+        if (this.snapOverlayActive) {
+            const cols = this.snapGrid.cols, rows = this.snapGrid.rows;
+            ctx.strokeStyle = 'rgba(0,217,255,0.6)';
+            for (let c = 1; c < cols; c++) {
+                const x = Math.round((c / cols) * w);
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            }
+            for (let r = 1; r < rows; r++) {
+                const y = Math.round((r / rows) * h);
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            }
+            // Highlight current cell under cursor
+            const vw = (this.virtual?.width || window.innerWidth);
+            const vh = (this.virtual?.height || window.innerHeight);
+            const cx = (this.virtualCursor.x / vw) * w;
+            const cy = (this.virtualCursor.y / vh) * h;
+            const col = Math.min(cols - 1, Math.max(0, Math.floor((cx / w) * cols)));
+            const row = Math.min(rows - 1, Math.max(0, Math.floor((cy / h) * rows)));
+            const cellW = w / cols, cellH = h / rows;
+            ctx.fillStyle = 'rgba(0,217,255,0.12)';
+            ctx.fillRect(col * cellW, row * cellH, cellW, cellH);
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.fillText(`Snap: ${cols}x${rows} (${col+1},${row+1})`, 12, 38);
+        }
     }
     
     updateConfidence() {
@@ -705,6 +735,25 @@ class UltraGestureTracker {
     async executePinch(pinch) {
         console.log('👌 Pinch detected!', pinch.strength);
         
+        // If snap overlay active, snap to highlighted cell and exit
+        if (this.snapOverlayActive) {
+            try {
+                const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                const vw = (this.virtual?.width || window.innerWidth);
+                const vh = (this.virtual?.height || window.innerHeight);
+                const w = this.canvas?.width || window.innerWidth;
+                const h = this.canvas?.height || window.innerHeight;
+                const cols = this.snapGrid.cols, rows = this.snapGrid.rows;
+                const cx = (this.virtualCursor.x / vw) * w;
+                const cy = (this.virtualCursor.y / vh) * h;
+                const col = Math.min(cols - 1, Math.max(0, Math.floor((cx / w) * cols)));
+                const row = Math.min(rows - 1, Math.max(0, Math.floor((cy / h) * rows)));
+                await fetch(`${API_BASE_URL}/api/windows/snap_grid?cols=${cols}&rows=${rows}&col=${col}&row=${row}`, { method: 'POST' });
+            } catch {}
+            this.snapOverlayActive = false;
+            return;
+        }
+        
         // Visual feedback
         if (this.cursorElement) {
             this.cursorElement.style.transform = 'translate(-50%, -50%) scale(0.7)';
@@ -794,6 +843,14 @@ class UltraGestureTracker {
             if (!data?.success) return;
             const exe = (data.exe || '').toLowerCase();
 
+            // Custom bindings from localStorage override defaults
+            const custom = this.loadAppBindings();
+            const appCfg = custom[exe];
+            if (appCfg && appCfg[direction]) {
+                await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: appCfg[direction] }) });
+                return;
+            }
+
             // VSCode: left/right = switch tabs, up = command palette, down = close tab
             if (exe.includes('code.exe')) {
                 if (direction === 'left') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+pageup' }) });
@@ -809,6 +866,35 @@ class UltraGestureTracker {
                 if (direction === 'up') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+t' }) });
                 if (direction === 'down') await fetch(`${API_BASE_URL}/api/keyboard/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ combo: 'ctrl+w' }) });
             }
+        } catch {}
+    }
+    
+    loadAppBindings() {
+        try {
+            return JSON.parse(localStorage.getItem('app_gesture_bindings') || '{}');
+        } catch { return {}; }
+    }
+    
+    saveAppBindings(cfg) {
+        localStorage.setItem('app_gesture_bindings', JSON.stringify(cfg));
+    }
+    
+    async configureAppBindingPrompt() {
+        try {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const resp = await fetch(`${API_BASE_URL}/api/windows/active_window`);
+            const data = await resp.json();
+            if (!data?.success) return;
+            const exe = (data.exe || '').toLowerCase();
+            const dir = prompt(`Bind gesture for ${exe}\nEnter direction (left/right/up/down/up-left/up-right/down-left/down-right):`);
+            if (!dir) return;
+            const combo = prompt(`Enter hotkey combo (e.g., ctrl+alt+t):`);
+            if (!combo) return;
+            const cfg = this.loadAppBindings();
+            cfg[exe] = cfg[exe] || {};
+            cfg[exe][dir] = combo;
+            this.saveAppBindings(cfg);
+            if (window.notificationSystem) window.notificationSystem.show(`🔗 Bound ${dir} → ${combo} for ${exe}`, 'success');
         } catch {}
     }
 
@@ -884,6 +970,20 @@ class UltraGestureTracker {
             this._profileTimer = setInterval(() => this.updateAppProfile(), 3000);
         }
         processFrame();
+        
+        // Bind overlay toggle hotkey (Ctrl+Alt+S) and bindings editor (Ctrl+Alt+B)
+        if (!this._hotkeysBound) {
+            this._hotkeysBound = true;
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 's') {
+                    this.snapOverlayActive = !this.snapOverlayActive;
+                    if (window.notificationSystem) window.notificationSystem.show(this.snapOverlayActive ? '🧩 Snap grid ON' : '🧩 Snap grid OFF', 'info');
+                }
+                if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'b') {
+                    this.configureAppBindingPrompt();
+                }
+            });
+        }
     }
 
     pause() {
