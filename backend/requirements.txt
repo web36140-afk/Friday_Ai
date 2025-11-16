@@ -1,0 +1,98 @@
+# Core Dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+python-multipart==0.0.6
+
+# LLM Providers
+openai==1.10.0
+anthropic==0.18.1
+groq==0.4.2
+google-generativeai>=0.8.0  # For Gemini (Hindi & Nepali) - Latest version for gemini-1.5-flash
+
+# Text-to-Speech (Natural human-like voices - like Perplexity)
+edge-tts==7.2.3
+aiohttp==3.9.1
+duckduckgo-search==4.1.1
+pydub==0.25.1  # Audio processing
+
+# Local LLM Support
+llama-cpp-python==0.2.55
+ollama==0.1.7
+
+# Advanced NLP & Intelligence
+nltk==3.8.1  # Natural Language Toolkit (lightweight)
+
+# SEMANTIC MEMORY SYSTEM (CRITICAL for ChatGPT-level context)
+sentence-transformers==2.3.1  # Semantic embeddings for context understanding
+chromadb==0.4.22  # Vector database for semantic memory
+
+# OPTIONAL: Uncomment for even more power
+# openai==1.6.1  # GPT-4 support (requires API key)
+
+# LangChain for Advanced Conversation Memory (Compatible versions)
+langchain==0.1.0  # Advanced conversation chains
+langchain-community==0.0.13  # LangChain community tools (compatible)
+
+# Web Search
+duckduckgo-search==4.1.1
+requests==2.31.0
+beautifulsoup4==4.12.3
+googlesearch-python==1.2.3
+
+# File Operations
+aiofiles==23.2.1
+watchdog==4.0.0
+chardet==5.2.0
+
+# Document Processing
+PyPDF2==3.0.1
+python-docx==1.1.0
+Pillow==10.2.0
+python-magic-bin==0.4.14
+
+# Cloud Storage (Optional - for production)
+# firebase-admin==6.3.0  # Commented out for now
+# google-cloud-firestore==2.14.0  # Commented out for now
+
+# Code Execution
+astunparse==1.6.3
+black==24.1.1
+pylint==3.0.3
+
+# OS Automation & Gesture Control (Windows)
+pyautogui==0.9.54  # Mouse/keyboard automation for gesture control
+pywin32==306  # Windows API for system control (volume, brightness, media keys)
+psutil==5.9.8  # System monitoring and process management
+wmi==1.5.1  # Windows Management Instrumentation
+
+# Advanced Gesture Control & Computer Vision
+opencv-python-headless==4.8.1.78  # Computer vision (headless for servers)
+mediapipe==0.10.9  # Advanced hand tracking (latest version)
+# numpy==1.24.4 already satisfied by other dependencies
+scipy==1.11.4  # Signal processing for gesture smoothing
+
+# Hardware Monitoring
+py-cpuinfo==9.0.0
+GPUtil==1.4.0
+nvidia-ml-py3==7.352.0
+
+# Notifications & System Integration
+plyer==2.1.0  # Cross-platform notifications
+
+# Utilities
+httpx==0.25.2
+ujson==5.9.0
+orjson==3.9.12
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Database
+sqlalchemy==2.0.25
+aiosqlite==0.19.0
+
+# Logging & Monitoring
+loguru==0.7.2
+
