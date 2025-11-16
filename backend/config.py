@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     enable_os_automation: bool = Field(default=True, env="ENABLE_OS_AUTOMATION")
     enable_hardware_monitoring: bool = Field(default=True, env="ENABLE_HARDWARE_MONITORING")
     enable_local_tts: bool = Field(default=True, env="ENABLE_LOCAL_TTS")
+
+    # ============================================
+    # Local LLM (llama.cpp) Configuration
+    # ============================================
+    enable_local_llm: bool = Field(default=False, env="ENABLE_LOCAL_LLM")
+    local_llm_model_path: str = Field(default="", env="LOCAL_LLM_MODEL_PATH")  # e.g., C:\\models\\qwen2.5-7b-instruct-q4_k_m.gguf
+    local_llm_n_ctx: int = Field(default=4096, env="LOCAL_LLM_N_CTX")
+    local_llm_threads: int = Field(default=4, env="LOCAL_LLM_THREADS")
+    local_llm_gpu_layers: int = Field(default=0, env="LOCAL_LLM_GPU_LAYERS")  # 0 = CPU only
     
     # Code Execution
     code_execution_timeout: int = Field(default=30, env="CODE_EXECUTION_TIMEOUT")

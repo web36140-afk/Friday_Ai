@@ -22,7 +22,7 @@ const state = {
     conversationMessages: savedMessages,  // FULL MESSAGE HISTORY
     
     currentProjectId: null,
-    provider: 'auto',  // Auto-select based on language
+    provider: 'auto',  // 'auto' | 'local'
     model: null,  // Auto-select based on provider
     temperature: 0.7,
     language: 'en-US',
@@ -626,19 +626,20 @@ async function streamChatResponse(message) {
         });
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
-        // V2: Send FULL conversation history - Backend auto-selects provider
-        const response = await fetch(`${API_BASE_URL}/api/chat/v2/stream`, {
+        // V2: Send FULL conversation history
+        const endpoint = state.provider === 'local'
+            ? `${API_BASE_URL}/api/llm/local_stream`
+            : `${API_BASE_URL}/api/chat/v2/stream`;
+        const payload = (state.provider === 'local')
+            ? { messages: state.conversationMessages, temperature: state.temperature }
+            : { messages: state.conversationMessages, conversation_id: state.currentConversationId, language: state.language, temperature: state.temperature };
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                messages: state.conversationMessages,  // FULL HISTORY
-                conversation_id: state.currentConversationId,
-                language: state.language,
-                temperature: state.temperature
-                // provider auto-selected by backend based on language
-            })
+            body: JSON.stringify(payload)
         });
         
         if (!response.ok) {
@@ -1603,6 +1604,14 @@ function openSettings() {
             voiceRateValue.textContent = e.target.value;
         });
     }
+
+    // Quick toggle to local LLM (Ctrl+L)
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+            state.provider = state.provider === 'local' ? 'auto' : 'local';
+            showNotification(`LLM provider: ${state.provider.toUpperCase()}`, 'info');
+        }
+    });
 }
 
 function closeSettings() {
