@@ -240,6 +240,10 @@ class VoiceCommandExecutor(BaseTool):
     async def _parse_and_execute(self, command: str) -> Dict[str, Any]:
         """Parse command and execute appropriate action"""
         
+        # Special-case: "open youtube" should open default browser to youtube.com
+        if "youtube" in command:
+            return await self._open_website("youtube")
+        
         # 1. Check for browser + website combo
         browser_website = self._parse_browser_website(command)
         if browser_website:
