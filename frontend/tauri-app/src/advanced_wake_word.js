@@ -124,6 +124,11 @@ class AdvancedWakeWordSystem {
     onWakeWordDetected() {
         // STOP all current activities
         this.stopAllActivities();
+
+        // Ensure TTS is interrupted cleanly (barge-in)
+        if (window.streamingTTS && typeof window.streamingTTS.stopSpeaking === 'function') {
+            window.streamingTTS.stopSpeaking();
+        }
         
         // Show activation feedback
         this.showActivationFeedback();

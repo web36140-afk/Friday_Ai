@@ -11,6 +11,7 @@ class StreamingTTSEngine {
         this.pendingChunks = [];
         this.chunkCounter = 0;
         this.isStopped = false;
+        this.audioCache = new Map(); // text -> dataURL (lightweight cache)
         
         console.log('🎵 Streaming TTS Engine initialized');
     }
@@ -56,6 +57,17 @@ class StreamingTTSEngine {
             const language = window.fridayState?.language || 'en-US';
             
             console.log(`🎤 Generating TTS for chunk ${chunkId}...`);
+
+            // Lightweight cache: reuse identical phrases
+            const cacheKey = `${language}|${text}`;
+            if (this.audioCache.has(cacheKey)) {
+                const cachedAudio = this.audioCache.get(cacheKey);
+                this.audioQueue.push({ id: chunkId, audio: cachedAudio, text });
+                this.audioQueue.sort((a, b) => a.id - b.id);
+                if (!this.isPlaying) this.playNextInQueue();
+                console.log(`⚡ TTS cache hit for chunk ${chunkId}`);
+                return;
+            }
             
             const response = await fetch(`${API_BASE_URL}/api/chat/tts`, {
                 method: 'POST',
@@ -76,6 +88,9 @@ class StreamingTTSEngine {
             
             if (data.success && data.audio) {
                 console.log(`✅ TTS ready for chunk ${chunkId}`);
+
+                // Store in cache
+                this.audioCache.set(cacheKey, data.audio);
                 
                 // Add to queue with chunk ID for ordering
                 this.audioQueue.push({
@@ -234,6 +249,14 @@ class StreamingTTSEngine {
         this.clearQueue();
         
         this.updateUI(false);
+    }
+
+    /**
+     * Public helper to stop speaking (alias for barge-in)
+     */
+    stopSpeaking() {
+        this.stopAll();
+        this.isStopped = false; // Allow new playback after interruption
     }
 
     /**
