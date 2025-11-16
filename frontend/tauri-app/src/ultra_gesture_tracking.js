@@ -68,6 +68,12 @@ class UltraGestureTracker {
             minFrameTime: 16 // ~60fps
         };
         
+        // Confidence tracking
+        this.confidence = {
+            value: 1.0,
+            lowFrames: 0
+        };
+        
         // Multi-hand support
         this.hands_data = {
             left: null,
@@ -351,6 +357,10 @@ class UltraGestureTracker {
         
         // Render fingertip overlay and HUD
         this.renderHUD();
+        
+        // Confidence and auto-recalibration
+        this.updateConfidence();
+        this.autoRecalibrateIfNeeded();
     }
 
     async processCursorControl(landmarks) {
@@ -471,7 +481,57 @@ class UltraGestureTracker {
         ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
         const fps = window.gestureOptimizer?.getFPS?.() || '';
         const latency = Math.round(this.performance.lastProcessTime);
-        ctx.fillText(`FPS: ${fps || '--'} | Latency: ${latency}ms`, 12, 20);
+        const confPct = Math.round((this.confidence?.value || 0) * 100);
+        ctx.fillText(`FPS: ${fps || '--'} | Latency: ${latency}ms | Confidence: ${confPct}%`, 12, 20);
+    }
+    
+    updateConfidence() {
+        // Simple confidence estimation based on fingertip continuity and motion stability
+        const fingertipIndices = this.fingerSmoothing.indices;
+        let continuity = 0;
+        let samples = 0;
+        let jitterScore = 0;
+        fingertipIndices.forEach((fi) => {
+            const hist = this.fingerSmoothing.history.get(String(fi)) || [];
+            if (hist.length >= 3) {
+                continuity += 1;
+                // Jitter over last 3 deltas
+                const a = hist[hist.length - 3], b = hist[hist.length - 2], c = hist[hist.length - 1];
+                const j1 = Math.hypot(b.x - a.x, b.y - a.y);
+                const j2 = Math.hypot(c.x - b.x, c.y - b.y);
+                jitterScore += (j1 + j2) / 2;
+                samples += 1;
+            }
+        });
+        const contRatio = continuity / fingertipIndices.length; // 0..1
+        const avgJitter = samples ? (jitterScore / samples) : 0; // pixels
+        // Map jitter to penalty (0 at 0px, 1 at >= 80px)
+        const jitterPenalty = Math.max(0, Math.min(1, avgJitter / 80));
+        // Incorporate processing delay
+        const latencyPenalty = Math.max(0, Math.min(1, (this.performance.lastProcessTime - 16) / 34)); // 16ms good, >50ms bad
+        const conf = Math.max(0, Math.min(1, contRatio * (1 - 0.5 * jitterPenalty) * (1 - 0.3 * latencyPenalty)));
+        this.confidence.value = conf;
+        if (conf < 0.55) this.confidence.lowFrames++; else this.confidence.lowFrames = 0;
+    }
+    
+    autoRecalibrateIfNeeded() {
+        // If confidence is low for ~1.5s, auto-apply balanced preset and lower detection thresholds
+        if (this.confidence.lowFrames > 90) {
+            this.confidence.lowFrames = 0;
+            if (window.gestureCalibration) {
+                window.gestureCalibration.applyPreset?.('balanced');
+                window.gestureCalibration.applyLightingOptimization?.('low');
+                if (window.notificationSystem) {
+                    window.notificationSystem.show('🔧 Auto-optimized gesture tracking for stability', 'info', 2000);
+                }
+            } else if (this.hands) {
+                // Fallback: relax thresholds
+                this.hands.setOptions({
+                    minDetectionConfidence: 0.3,
+                    minTrackingConfidence: 0.3
+                });
+            }
+        }
     }
 
     async detectGestures(landmarks) {
