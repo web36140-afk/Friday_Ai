@@ -170,13 +170,21 @@ class AdvancedWakeWordSystem {
     // COMMAND LISTENING (With VAD)
     // ============================================
     startCommandListening() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const useLocalSTT = !!window.localSTT;
+        const SpeechRecognition = (!useLocalSTT) && (window.SpeechRecognition || window.webkitSpeechRecognition);
         
-        this.commandRecognition = new SpeechRecognition();
-        this.commandRecognition.continuous = true;
-        this.commandRecognition.interimResults = true;
-        this.commandRecognition.lang = window.fridayState?.language || 'en-US';
-        this.commandRecognition.maxAlternatives = 5;
+        if (!useLocalSTT && !SpeechRecognition) {
+            console.error('❌ Speech recognition not supported');
+            return;
+        }
+
+        if (!useLocalSTT) {
+            this.commandRecognition = new SpeechRecognition();
+            this.commandRecognition.continuous = true;
+            this.commandRecognition.interimResults = true;
+            this.commandRecognition.lang = window.fridayState?.language || 'en-US';
+            this.commandRecognition.maxAlternatives = 5;
+        }
         
         this.isListeningForCommand = true;
         this.commandStarted = false;
@@ -189,41 +197,53 @@ class AdvancedWakeWordSystem {
         console.log('👂 Listening for command...');
         console.log('🔧 VAD Settings:', this.vadSettings);
 
-        this.commandRecognition.onresult = (event) => {
-            const last = event.results.length - 1;
-            const result = event.results[last];
-            const transcript = result[0].transcript.trim();
-            
-            if (transcript.length > 0) {
+        if (useLocalSTT) {
+            window.localSTT.start((text, isFinal) => {
+                if (!text || text.trim().length === 0) return;
                 this.commandStarted = true;
-                this.currentCommand = transcript;
-                
-                // Update UI with live transcript
-                this.updateCommandPreview(transcript);
-                
-                // Reset silence timer (user is still speaking)
+                this.currentCommand = text.trim();
+                this.updateCommandPreview(this.currentCommand);
                 this.resetSilenceTimer();
+            });
+        } else {
+            this.commandRecognition.onresult = (event) => {
+                const last = event.results.length - 1;
+                const result = event.results[last];
+                const transcript = result[0].transcript.trim();
                 
-                // If final result, start silence detection
-                if (result.isFinal) {
-                    console.log('📝 Final transcript:', transcript);
-                    this.startSilenceDetection();
+                if (transcript.length > 0) {
+                    this.commandStarted = true;
+                    this.currentCommand = transcript;
+                    
+                    // Update UI with live transcript
+                    this.updateCommandPreview(transcript);
+                    
+                    // Reset silence timer (user is still speaking)
+                    this.resetSilenceTimer();
+                    
+                    // If final result, start silence detection
+                    if (result.isFinal) {
+                        console.log('📝 Final transcript:', transcript);
+                        this.startSilenceDetection();
+                    }
                 }
-            }
-        };
+            };
+        }
 
-        this.commandRecognition.onerror = (event) => {
-            console.error('Command recognition error:', event.error);
-            
-            // If we have a command, submit it before resetting
-            if (this.currentCommand.length >= this.vadSettings.minCommandLength) {
-                console.log('📝 Error occurred but we have command, submitting:', this.currentCommand);
-                this.submitCommand();
-            } else {
-                console.log('❌ Error and no valid command, resetting');
-                this.resetToWakeWord();
-            }
-        };
+        if (!useLocalSTT) {
+            this.commandRecognition.onerror = (event) => {
+                console.error('Command recognition error:', event.error);
+                
+                // If we have a command, submit it before resetting
+                if (this.currentCommand.length >= this.vadSettings.minCommandLength) {
+                    console.log('📝 Error occurred but we have command, submitting:', this.currentCommand);
+                    this.submitCommand();
+                } else {
+                    console.log('❌ Error and no valid command, resetting');
+                    this.resetToWakeWord();
+                }
+            };
+        }
 
         this.commandRecognition.onend = () => {
             console.log('Command recognition ended');
@@ -241,7 +261,7 @@ class AdvancedWakeWordSystem {
         };
 
         // Start command recognition
-        this.commandRecognition.start();
+        if (!useLocalSTT) this.commandRecognition.start();
         
         // Safety timeout - auto-submit after max duration
         setTimeout(() => {

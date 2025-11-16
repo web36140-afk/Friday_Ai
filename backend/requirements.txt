@@ -28,6 +28,7 @@ nltk==3.8.1  # Natural Language Toolkit (lightweight)
 # SEMANTIC MEMORY SYSTEM (CRITICAL for ChatGPT-level context)
 sentence-transformers==2.3.1  # Semantic embeddings for context understanding
 chromadb==0.4.22  # Vector database for semantic memory
+faiss-cpu==1.7.4 ; platform_system != "Windows"
 
 # OPTIONAL: Uncomment for even more power
 # openai==1.6.1  # GPT-4 support (requires API key)
@@ -95,4 +96,8 @@ aiosqlite==0.19.0
 
 # Logging & Monitoring
 loguru==0.7.2
+
+# Offline STT (Whisper)
+faster-whisper==1.0.0
+soundfile==0.12.1
 

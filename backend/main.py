@@ -198,6 +198,8 @@ app.include_router(ultra_gesture_api.router, tags=["Ultra Gesture Control"])
 app.include_router(voice_commands_api.router, tags=["Voice Commands"])
 app.include_router(alexa_api.router, tags=["Alexa Features"])
 app.include_router(opencv_gesture_api.router, tags=["OpenCV Gesture Control"])
+from api import stt_api
+app.include_router(stt_api.router, tags=["Offline STT"])
 
 # TTS endpoint
 from fastapi import Body
